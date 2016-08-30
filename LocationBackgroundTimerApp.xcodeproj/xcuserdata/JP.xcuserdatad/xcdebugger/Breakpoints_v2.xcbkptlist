@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bucket
+   type = "1"
+   version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "LocationBackgroundTimerApp/ViewController.swift"
+            timestampString = "494286615.17227"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "254"
+            endingLineNumber = "254"
+            landmarkName = "locationManager(_:didUpdateLocations:)"
+            landmarkType = "5">
+            <Locations>
+               <Location
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "LocationBackgroundTimerApp.ViewController.locationManager (__ObjC.CLLocationManager, didUpdateLocations : Swift.Array&lt;__ObjC.CLLocation&gt;) -&gt; ()"
+                  moduleName = "LocationBackgroundTimerApp"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/JP/Desktop/LocationBackgroundTimerApp/LocationBackgroundTimerApp/ViewController.swift"
+                  timestampString = "494286615.223152"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "254"
+                  endingLineNumber = "254"
+                  offsetFromSymbolStart = "516">
+               </Location>
+               <Location
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "LocationBackgroundTimerApp.ViewController.(locationManager (__ObjC.CLLocationManager, didUpdateLocations : Swift.Array&lt;__ObjC.CLLocation&gt;) -&gt; ()).(closure #1)"
+                  moduleName = "LocationBackgroundTimerApp"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/JP/Desktop/LocationBackgroundTimerApp/LocationBackgroundTimerApp/ViewController.swift"
+                  timestampString = "494286615.223374"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "255"
+                  endingLineNumber = "255"
+                  offsetFromSymbolStart = "16">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "LocationBackgroundTimerApp/ViewController.swift"
+            timestampString = "494286615.17227"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "255"
+            endingLineNumber = "255"
+            landmarkName = "locationManager(_:didUpdateLocations:)"
+            landmarkType = "5">
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
+</Bucket>
