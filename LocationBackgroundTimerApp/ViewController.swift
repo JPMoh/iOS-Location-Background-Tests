@@ -9,16 +9,18 @@
 import UIKit
 import CoreLocation
 import CoreData
+import CoreBluetooth
 
-class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDataSource, UITableViewDelegate{
+class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDataSource, UITableViewDelegate, CBCentralManagerDelegate {
 
     let DATEFORMAT : String = "dd-MM-yyyy, HH:mm:ss"
-    
     var locationTimes = [String]()
+
+    
     @IBOutlet weak var tableView: UITableView!
     //- Time intervals for scan
     var UpdatesInterval : NSTimeInterval = 10*60
-    var KeepAliveTimeInterval : Double = 5*60 // App gets a new location every 5 minutes to keep timers alive
+    var KeepAliveTimeInterval : Double = 20*60 // App gets a new location every 5 minutes to keep timers alive
     
     //- NSTimer object for scheduling accuracy changes
     var timer = NSTimer()
@@ -62,6 +64,9 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
         
         self.defaultCentre.addObserver(self, selector: #selector(ViewController.appWillTerminate(_:)), name: UIApplicationWillTerminateNotification, object: nil)
         self.defaultCentre.addObserver(self, selector: #selector(ViewController.appIsRelaunched(_:)), name: UIApplicationDidFinishLaunchingNotification, object: nil)
+        
+        
+        self.centralManager = CBCentralManager(delegate: self, queue: nil, options: nil)
 
         startLocationServices()
         // Do any additional setup after loading the view, typically from a nib.
@@ -129,31 +134,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
             //- TODO: Unauthorized, requests permissions again and makes recursive call
         }
     }
-    /********************************************************************************************************************
-     METHOD NAME: stopLocationServices
-     INPUT PARAMETERS: None
-     RETURNS: None
-     
-     OBSERVATIONS: Stops location services if not enabled already, checks user permissions
-     ********************************************************************************************************************/
-    
-    func stopLocationServices() {
-        
-        if(self.updatesEnabled) {
-            
-            self.updatesEnabled = false;
-            self.locationManager.stopUpdatingLocation()
-            
-            //- Stops Timer
-            self.timer.invalidate()
-            
-            //- Save Location Services DISABLED to NSUserDefaults
-            self.UserDefaults.setBool(false, forKey: self.LocationServicesControl_KEY)
-            
-        } else {
-            print("Location updates have not been enabled")
-        }
-    }
+
     /********************************************************************************************************************
      METHOD NAME: changeLocationAccuracy
      INPUT PARAMETERS: None
@@ -201,6 +182,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
      ********************************************************************************************************************/
     func appWillTerminate (notification: NSNotification){
         
+        print("app terminated")
         let ServicesEnabled = self.UserDefaults.boolForKey(self.LocationServicesControl_KEY)
         
         //- Stops Standard Location Services if they have been enabled by the user
@@ -212,6 +194,8 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
             //- Stops Timer
             self.timer.invalidate()
             
+            self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+
             //- Enables Significant Location Changes services to restart the app ASAP
             self.locationManager.startMonitoringSignificantLocationChanges()
         }
@@ -228,6 +212,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
      ********************************************************************************************************************/
     func appIsRelaunched (notification: NSNotification) {
         
+        print("app is relaunched")
         //- Stops Significant Location Changes services when app is relaunched
         self.locationManager.stopMonitoringSignificantLocationChanges()
         
@@ -235,13 +220,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
         
         //- Re-Starts Standard Location Services if they have been enabled by the user
         if (ServicesEnabled) {
-            //- TODO: Remove below after testing.
-            let localNotification:UILocalNotification = UILocalNotification()
-            localNotification.alertAction = "Application is running"
-            localNotification.alertBody = "I'm Alive!"
-            localNotification.fireDate = NSDate(timeIntervalSinceNow: 1)
-            UIApplication.sharedApplication().scheduleLocalNotification(localNotification)
-            //- TODO: Remove above after testing.
+
             self.startLocationServices()
         }
     }
@@ -250,8 +229,19 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
     func locationManager(manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         
         print("did update locations")
-        locationTimes.append("\(NSDate())")
-        
+
+        let qualityOfServiceClass = QOS_CLASS_BACKGROUND
+        let backgroundQueue = dispatch_get_global_queue(qualityOfServiceClass, 0)
+        dispatch_async(backgroundQueue, {
+            
+            if self.currentlyScanningBLE == false {
+                self.scanBLENow()
+            }
+            dispatch_async(dispatch_get_main_queue(), { () -> Void in
+                print("This is run on the main queue, after the previous code in outer block")
+            })
+        })
+
         self.bgTask = UIApplication.sharedApplication().beginBackgroundTaskWithExpirationHandler({
             UIApplication.sharedApplication().endBackgroundTask(self.bgTask)
             self.bgTask = UIBackgroundTaskInvalid
@@ -268,7 +258,9 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
         if ((abs(Interval)<5)&&(accuracy != kCLLocationAccuracyThreeKilometers)) {
             
             //- Updates Persistent records through the DataManager object
-            
+            postJSON(createJSONObject())
+            locationTimes.append("\(NSDate())")
+
             /* Timer initialized everytime an update is received. When timer expires, reverts accuracy to HIGH, thus
              enabling the delegate to receive new location updates */
             self.timer = NSTimer.scheduledTimerWithTimeInterval(self.KeepAliveTimeInterval, target: self, selector: #selector(ViewController.changeLocationAccuracy), userInfo: nil, repeats: false)
@@ -282,9 +274,130 @@ class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDa
         // END: Filters bad location updates cached by the OS ------------------------------------------------------
     }
     
+    func locationManager(manager: CLLocationManager, didChangeAuthorizationStatus status: CLAuthorizationStatus) {
+        
+        if status == CLAuthorizationStatus.AuthorizedAlways || status == CLAuthorizationStatus.AuthorizedWhenInUse {
+         
+            startLocationServices()
+
+        }
+    }
+    
+    func createJSONObject() -> [String: AnyObject] {
+  
+    let jSONObject: [String: AnyObject] = ["ids": ["ios_ifa^A79E8910-442B-4435-9FC8-A70F598158E6"],
+    "lat" : -22.22,
+    "lon" : 33.33,
+    "token": "F3zm2tAvr7+Aei5G6QCD15Osr/ifXHrnFswJ6eSACRk=",
+    "timepoint": String(currentTimeMillis()),
+    "metadata" : ["device:iPhone 6", "sdk:ios-swift-1.0", "app:LocationBacgkroundTimerApp", "cWifi:JP Fake Wifi"],
+    "observed": [["tech" : "ble",
+        "rssi" : -95,
+        "name" : "HTC BS 5FE6D6:8F440A94-29EE-DCE2-13CE-41DF1072AE0C"]]
+    ]
+        
+        return jSONObject
+    }
+    
+    func bluetoothScan() {
+        
+    }
+    
+    func currentTimeMillis() -> Int64{
+        let nowDouble = NSDate().timeIntervalSince1970
+        return Int64(nowDouble)
+    }
+
+    
+    func postJSON(jsondictionary: [String: AnyObject]) {
+        do {
+            
+            let jsonData = try NSJSONSerialization.dataWithJSONObject(jsondictionary, options: NSJSONWritingOptions.PrettyPrinted)
+            
+            let url = NSURL(string: "https://pie.wirelessregistry.com/observation/")
+            let request = NSMutableURLRequest(URL: url!)
+            
+            request.HTTPMethod = "POST"
+            request.HTTPBody = jsonData
+            request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+            
+            NSLog("\(NSString(data: jsonData, encoding: NSUTF8StringEncoding)!)")
+            NSLog("stringjsondata")
+            
+            let task = NSURLSession.sharedSession().dataTaskWithRequest(request) { (data, response, error) -> Void in
+                
+                if let unwrappedError = error {
+                    NSLog("error=\(unwrappedError)")
+                    
+                }
+                else {
+                    if let _ = data {
+                        
+                        NSLog("\(response)")
+                        NSLog("success response")
+                        return
+                    }
+                }
+                
+            }
+            
+            task.resume()
+        }
+            
+        catch _ as NSError {
+            
+            NSLog("error")
+        }
+
+    }
     func locationManager(manager: CLLocationManager, didFailWithError error: NSError) {
         print("Location update error: \(error.localizedDescription)")
     }
+    
+    ///CB Protocol
+    
+    private var centralManager : CBCentralManager = CBCentralManager()
+    private var deviceInformationServiceUUID : CBUUID = CBUUID(string:"180A")
+    private var tileUUID1 : CBUUID = CBUUID(string:"FEED")
+    private var tileUUID2 : CBUUID = CBUUID(string:"FEEC")
+    private var currentlyScanningBLE = false
+    func scanBLENow() {
+       
+        currentlyScanningBLE = true
+        centralManager.scanForPeripheralsWithServices([tileUUID1, tileUUID2,deviceInformationServiceUUID] , options: nil)
+        sleep(UInt32(15))
+        centralManager.stopScan()
+        currentlyScanningBLE = false
+    
+    }
+    
+    func centralManagerDidUpdateState(central: CBCentralManager) {
+        
+        NSLog("centralmanagerdidupdatestate")
+        switch (central.state) {
+        case .Unsupported:
+            NSLog("unsupported")
+        case .Unauthorized:
+            NSLog("unauthorize")
+        case .Resetting:
+            NSLog("resetting")
+        case .PoweredOff:
+            NSLog("poweredoff")
+        case .PoweredOn:
+            NSLog("powered on")
+        default:
+            NSLog("default")
+        }
+        
+    }
+    
+    func centralManager(central: CBCentralManager, didDiscoverPeripheral peripheral: CBPeripheral, advertisementData: [String : AnyObject], RSSI: NSNumber) {
+        
+        NSLog("found a peripheral")
+        
+    }
+
+    
 }
 
 
